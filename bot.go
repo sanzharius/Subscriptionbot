@@ -80,24 +80,25 @@ func (bot *Bot) GetMessageByUpdate(update *tgbotapi.Update, ctx context.Context,
 		}
 	}
 	if update.Message.Location != nil {
-		getWeatherResponse, err := bot.PushWeatherUpdates(ctx, message, update.Message.Location)
+		getWeatherResponse, err := bot.Subscribe(ctx, message, update.Message.Location)
 		if err != nil {
 			return nil, err
 		}
+
 		msg.Text = MapGetWeatherResponseHTML(getWeatherResponse)
 		msg.ParseMode = "HTML"
 	}
 	return &msg, nil
 }
 
-func (bot *Bot) Subscribe(ctx context.Context, msg Message, loc *tgbotapi.Location) error {
+func (bot *Bot) Subscribe(ctx context.Context, msg Message, loc *tgbotapi.Location) (*GetWeatherResponse, error) {
 	sub := Subscription{
 		ChatId: msg.Id.ID,
 		Lat:    loc.Latitude,
 		Lon:    loc.Longitude,
 	}
 	_, err := bot.db.UpsertOne(ctx, sub)
-	return err
+	return nil, err
 }
 
 func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
@@ -113,17 +114,20 @@ func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
 	return nil
 }
 
-func (bot *Bot) GetSubscriptions(ctx context.Context, update int) []*Subscription {
+func (bot *Bot) GetSubscriptions(ctx context.Context, update int) ([]*Subscription, error) {
 	filter := bson.D{{"update_time", update}}
 	subs, err := bot.db.Find(ctx, filter)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return nil, err
 	}
-	return subs
+
+	return subs, nil
 }
 
-func (bot *Bot) PushWeatherUpdates(ctx context.Context, msg Message, loc *tgbotapi.Location) (*GetWeatherResponse, error) {
-	ticker := time.NewTicker(time.Minute)
+func (bot *Bot) PushWeatherUpdates(ctx context.Context, msg Message) (*GetWeatherResponse, error) {
+	ticker := time.NewTicker(time.Second * 10)
+	ans := tgbotapi.NewMessage(msg.Id.ID, msg.Answer)
 
 	utcLocation, err := time.LoadLocation("UTC")
 	if err != nil {
@@ -135,15 +139,22 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context, msg Message, loc *tgbota
 		min := utcTime.Minute()
 		hour := utcTime.Hour()
 		updateTime := hour*100 + min
-		subs := bot.GetSubscriptions(ctx, updateTime)
-		_, err = bot.weatherClient.GetWeatherForecast(subs)
+		subs, err := bot.GetSubscriptions(ctx, updateTime)
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
+			return nil, err
 		}
-		err = bot.Subscribe(ctx, msg, loc)
+
+		pushAns, err := bot.weatherClient.GetWeatherForecast(subs)
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
 		}
+		_, err = bot.tgClient.Send(ans)
+		if err != nil {
+			log.Error(err)
+		}
+		ans.Text = MapGetWeatherResponseHTML(pushAns)
+		ans.ParseMode = "HTML"
 
 	}
 	return nil, nil

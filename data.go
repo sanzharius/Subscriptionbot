@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
 	"time"
 )
 
@@ -94,21 +94,23 @@ func (db *DbClient) Find(ctx context.Context, filter bson.D) ([]*Subscription, e
 		return nil, fmt.Errorf("error finding elements: %w", err)
 	}
 	defer func() {
-		err := cursor.Close(ctx)
-		if err != nil {
-			log.Fatal(err)
-		}
+		_ = cursor.Close(ctx)
 	}()
 
-	err = cursor.All(ctx, res)
+	err = cursor.All(ctx, &res)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	if err := cursor.Err(); err != nil {
 		return nil, fmt.Errorf("error given when finding elements: %w", err)
 	}
+
+	if len(res) <= 0 {
+		return nil, fmt.Errorf("data not found")
+	}
+
 	return res, nil
 }
 

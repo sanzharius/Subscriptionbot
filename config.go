@@ -62,8 +62,9 @@ type WeatherClient struct {
 }
 
 type Message struct {
-	Id  *tgbotapi.Chat
-	Loc *tgbotapi.Location
+	Id     *tgbotapi.Chat
+	Loc    *tgbotapi.Location
+	Answer string
 }
 
 func NewHTTPClient() *http.Client {
