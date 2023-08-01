@@ -13,9 +13,9 @@ import (
 )
 
 type DbClient struct {
-	Coll    *mongo.Collection
-	Client  *mongo.Client
-	Message Message
+	Coll   *mongo.Collection
+	Client *mongo.Client
+	/*Message Message*/
 }
 
 type Subscription struct {

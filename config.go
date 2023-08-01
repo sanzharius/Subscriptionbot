@@ -26,6 +26,7 @@ type Config struct {
 	Collection                  string `env:"COLLECTION"`
 	Db                          string `env:"DB"`
 	DbTimeout                   int    `env:"DB_TIMEOUT"`
+	Update                      *tgbotapi.Update
 }
 
 type GetWeatherResponse struct {
@@ -61,11 +62,11 @@ type WeatherClient struct {
 	client *http.Client
 }
 
-type Message struct {
+/*type Message struct {
 	Id     *tgbotapi.Chat
 	Loc    *tgbotapi.Location
 	Answer string
-}
+}*/
 
 func NewHTTPClient() *http.Client {
 	return &http.Client{
@@ -98,7 +99,7 @@ func NewConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func (weatherClient *WeatherClient) AppendQueryParamsToGetWeather(loc []*Subscription) (parsed string) {
+func (weatherClient *WeatherClient) AppendQueryParamsToGetWeather(latitude float64, longitude float64) (parsed string) {
 	URL, err := url.Parse(weatherClient.Config.WeatherApiHost)
 	if err != nil {
 		log.Fatal(err)
@@ -106,8 +107,8 @@ func (weatherClient *WeatherClient) AppendQueryParamsToGetWeather(loc []*Subscri
 
 	r := url.Values{}
 	r.Add("appid", weatherClient.Config.AppId)
-	r.Add("lat", fmt.Sprint(loc[0].Loc.Latitude))
-	r.Add("lon", fmt.Sprint(loc[1].Loc.Longitude))
+	r.Add("lat", fmt.Sprint(latitude))
+	r.Add("lon", fmt.Sprint(longitude))
 	r.Add("units", "metric")
 
 	URL.RawQuery = r.Encode()
@@ -115,8 +116,8 @@ func (weatherClient *WeatherClient) AppendQueryParamsToGetWeather(loc []*Subscri
 	return parsed
 }
 
-func (weatherClient *WeatherClient) GetWeatherForecast(loc []*Subscription) (*GetWeatherResponse, error) {
-	weatherURL := weatherClient.AppendQueryParamsToGetWeather(loc)
+func (weatherClient *WeatherClient) GetWeatherForecast(latitude float64, longitude float64) (*GetWeatherResponse, error) {
+	weatherURL := weatherClient.AppendQueryParamsToGetWeather(latitude, longitude)
 	resp, err := weatherClient.client.Get(weatherURL)
 	if err != nil {
 		log.Fatal(err)

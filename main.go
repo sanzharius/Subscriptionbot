@@ -35,18 +35,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tgBot.ReplyingOnMessages(ctx, db.Message)
-	errCh := make(chan error)
-	go func() {
-		if _, err := tgBot.PushWeatherUpdates(ctx, db.Message); err != nil {
-			errCh <- err
-		}
-	}()
+	tgBot.ReplyingOnMessages(ctx)
+	go tgBot.PushWeatherUpdates(ctx, cfg.Update)
 
-	err = <-errCh
-	if err != nil {
-		log.Println("error occurred while pushing updates", err)
-	}
 	//go tgBot.PushWeatherUpdates(ctx, db.Message)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), nil))
 }

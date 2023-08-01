@@ -32,13 +32,13 @@ func NewBot(config *Config, weatherClient *WeatherClient, tgClient *tgbotapi.Bot
 	}, nil
 }
 
-func (bot *Bot) ReplyingOnMessages(ctx context.Context, message Message) {
+func (bot *Bot) ReplyingOnMessages(ctx context.Context) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = bot.cfg.TelegramMessageTimeOutInSec
 
 	updates := bot.tgClient.GetUpdatesChan(u)
 	for update := range updates {
-		msg, err := bot.GetMessageByUpdate(&update, ctx, message)
+		msg, err := bot.GetMessageByUpdate(ctx, &update)
 		if err != nil {
 			log.Error(err)
 			continue
@@ -50,7 +50,7 @@ func (bot *Bot) ReplyingOnMessages(ctx context.Context, message Message) {
 	}
 }
 
-func (bot *Bot) GetMessageByUpdate(update *tgbotapi.Update, ctx context.Context, message Message) (*tgbotapi.MessageConfig, error) {
+func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update) (*tgbotapi.MessageConfig, error) {
 	if update.Message == nil {
 		return nil, nil
 	}
@@ -74,13 +74,18 @@ func (bot *Bot) GetMessageByUpdate(update *tgbotapi.Update, ctx context.Context,
 		if _, err := bot.tgClient.Send(txt2); err != nil {
 			log.Panic(err)
 		}
-		err := bot.Unsubscribe(ctx, message.Id.ID)
+		err := bot.Unsubscribe(ctx, update.Message.Chat.ID)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 	if update.Message.Location != nil {
-		getWeatherResponse, err := bot.Subscribe(ctx, message, update.Message.Location)
+		err := bot.Subscribe(ctx, update.Message)
+		if err != nil {
+			return nil, err
+		}
+
+		getWeatherResponse, err := bot.weatherClient.GetWeatherForecast(update.Message.Location.Latitude, update.Message.Location.Longitude)
 		if err != nil {
 			return nil, err
 		}
@@ -91,14 +96,15 @@ func (bot *Bot) GetMessageByUpdate(update *tgbotapi.Update, ctx context.Context,
 	return &msg, nil
 }
 
-func (bot *Bot) Subscribe(ctx context.Context, msg Message, loc *tgbotapi.Location) (*GetWeatherResponse, error) {
+func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error {
 	sub := Subscription{
-		ChatId: msg.Id.ID,
-		Lat:    loc.Latitude,
-		Lon:    loc.Longitude,
+		ChatId: message.Chat.ID,
+		Lat:    message.Location.Latitude,
+		Lon:    message.Location.Longitude,
 	}
 	_, err := bot.db.UpsertOne(ctx, sub)
-	return nil, err
+	return err
+	//fix getweatherreponse
 }
 
 func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
@@ -125,9 +131,9 @@ func (bot *Bot) GetSubscriptions(ctx context.Context, update int) ([]*Subscripti
 	return subs, nil
 }
 
-func (bot *Bot) PushWeatherUpdates(ctx context.Context, msg Message) (*GetWeatherResponse, error) {
+func (bot *Bot) PushWeatherUpdates(ctx context.Context, upd *tgbotapi.Update) {
 	ticker := time.NewTicker(time.Second * 10)
-	ans := tgbotapi.NewMessage(msg.Id.ID, msg.Answer)
+	ans := tgbotapi.NewMessage(upd.Message.Chat.ID, upd.Message.Text)
 
 	utcLocation, err := time.LoadLocation("UTC")
 	if err != nil {
@@ -142,22 +148,40 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context, msg Message) (*GetWeathe
 		subs, err := bot.GetSubscriptions(ctx, updateTime)
 		if err != nil {
 			log.Error(err)
-			return nil, err
+		}
+		for _, s := range subs {
+			pushAns, err := bot.weatherClient.GetWeatherForecast(s.Lat, s.Lon)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			_, err = bot.tgClient.Send(ans)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+
+			ans.Text = MapGetWeatherResponseHTML(pushAns)
+			ans.ParseMode = "HTML"
 		}
 
-		pushAns, err := bot.weatherClient.GetWeatherForecast(subs)
+		/*pushAns, err := bot.weatherClient.GetWeatherForecast(subs)
+		//for each on subs for each sub use Send
 		if err != nil {
 			log.Error(err)
+			return
 		}
+
 		_, err = bot.tgClient.Send(ans)
 		if err != nil {
 			log.Error(err)
+			return
 		}
+
 		ans.Text = MapGetWeatherResponseHTML(pushAns)
-		ans.ParseMode = "HTML"
+		ans.ParseMode = "HTML"*/
 
 	}
-	return nil, nil
 }
 
 func MapGetWeatherResponseHTML(list *GetWeatherResponse) string {
