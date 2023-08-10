@@ -27,7 +27,7 @@ type Subscription struct {
 	Loc        *tgbotapi.Location
 }
 
-func NewDbClient(cfg *config.Config) *SubscriptionStorage {
+func NewSubscriptionStorage(cfg *config.Config) *SubscriptionStorage {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.DbTimeout)*time.Second)
 	defer cancel()
 

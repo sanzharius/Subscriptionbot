@@ -152,23 +152,28 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 			log.Error(err)
 		}
 
-		for _, s := range subs {
-			pushAns, err := bot.weatherClient.GetWeatherForecast(s.Lat, s.Lon)
-			if err != nil {
-				log.Error(err)
-				return
-			}
-
-			msgText := MapGetWeatherResponseHTML(pushAns)
-			response := tgbotapi.NewMessage(s.ChatId, msgText)
-			response.ParseMode = "HTML"
-			_, err = bot.tgClient.Send(response)
-			if err != nil {
-				log.Error(err)
-				return
-			}
+		err = bot.SendWeatherUpdate(subs)
+		if err != nil {
+			log.Error(err)
 		}
 	}
+}
+
+func (bot *Bot) SendWeatherUpdate(sub []*database.Subscription) error {
+	pushAns, err := bot.weatherClient.GetWeatherForecast(sub[0].Lat, sub[1].Lon)
+	if err != nil {
+		return apperrors.MessageUnmarshallingError.AppendMessage(err)
+	}
+
+	reply := MapGetWeatherResponseHTML(pushAns)
+	message := tgbotapi.NewMessage(sub[0].ChatId, reply)
+	message.ParseMode = "HTML"
+	_, err = bot.tgClient.Send(message)
+	if err != nil {
+		return apperrors.MessageUnmarshallingError.AppendMessage(err)
+	}
+
+	return apperrors.DataNotFoundErr.AppendMessage(err)
 }
 
 func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {

@@ -24,7 +24,7 @@ func main() {
 	httpWeatherClient := httpclient.NewHTTPClient()
 	weatherClient := httpclient.NewWeatherClient(cfg, httpWeatherClient)
 
-	db := database.NewDbClient(cfg)
+	db := database.NewSubscriptionStorage(cfg)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
