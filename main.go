@@ -29,7 +29,7 @@ func main() {
 	defer cancel()
 
 	httpTgClient := httpclient.NewHTTPClient()
-	tgClient, err := tgbotapi.NewBotAPIWithClient(cfg.TelegramBotTok, "https://api.telegram.org/bot%s/%s", httpTgClient)
+	tgClient, err := tgbotapi.NewBotAPIWithClient(cfg.TelegramBotTok, cfg.TelegramBotAPI, httpTgClient)
 	if err != nil {
 		log.Fatal(err)
 	}

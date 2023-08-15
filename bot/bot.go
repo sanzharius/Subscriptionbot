@@ -155,6 +155,7 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 		err = bot.SendWeatherUpdate(subs)
 		if err != nil {
 			log.Error(err)
+			return
 		}
 	}
 }

@@ -9,7 +9,7 @@ import (
 )
 
 type Config struct {
-	TelegramHost                string `env:"TELEGRAM_HOST"`
+	TelegramBotAPI              string `env:"TELEGRAM_BOT_API"`
 	TelegramBotTok              string `env:"TELEGRAM_BOT_TOKEN"`
 	Port                        string `env:"PORT"`
 	WeatherApiHost              string `env:"WEATHER_API_HOST"`
