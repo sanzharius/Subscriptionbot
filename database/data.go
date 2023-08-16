@@ -51,7 +51,7 @@ func (db *SubscriptionStorage) Disconnect(ctx context.Context) error {
 	return db.client.Disconnect(ctx)
 }
 
-func (db *SubscriptionStorage) InsertOne(ctx context.Context, ins Subscription) (primitive.ObjectID, error) {
+func (db *SubscriptionStorage) InsertOne(ctx context.Context, ins *Subscription) (primitive.ObjectID, error) {
 	result, err := db.collection.InsertOne(ctx, ins)
 	if err != nil {
 		return primitive.NilObjectID, apperrors.MongoDBDataNotFoundErr.AppendMessage(err)
@@ -65,7 +65,7 @@ func (db *SubscriptionStorage) InsertOne(ctx context.Context, ins Subscription) 
 	return id, nil
 }
 
-func (db *SubscriptionStorage) UpsertOne(ctx context.Context, ins Subscription) (*mongo.UpdateResult, error) {
+func (db *SubscriptionStorage) UpsertOne(ctx context.Context, ins *Subscription) (*mongo.UpdateResult, error) {
 	filter := bson.D{{"chat_id", ins.ChatId}}
 	update := bson.D{{"$set", bson.D{{"chat_", ins.ChatId}, {"lat", ins.Lat}, {"lon", ins.Lon},
 		{"update_time", ins.UpdateTime}}}}
@@ -118,7 +118,7 @@ func (db *SubscriptionStorage) Find(ctx context.Context, filter bson.D) ([]*Subs
 	return res, nil
 }
 
-func (db *SubscriptionStorage) UpdateByID(ctx context.Context, id primitive.ObjectID, upd Subscription) (int, error) {
+func (db *SubscriptionStorage) UpdateByID(ctx context.Context, id primitive.ObjectID, upd *Subscription) (int, error) {
 	updBson := bson.D{{"lat", upd.Lat}, {"lon", upd.Lon}}
 	updRes, err := db.collection.UpdateByID(ctx, id, bson.D{{"$set", updBson}})
 	if updRes.MatchedCount == 0 {

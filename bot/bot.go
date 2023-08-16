@@ -106,7 +106,7 @@ func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error 
 		Lat:    message.Location.Latitude,
 		Lon:    message.Location.Longitude,
 	}
-	_, err := bot.db.UpsertOne(ctx, sub)
+	_, err := bot.db.UpsertOne(ctx, &sub)
 	return apperrors.MongoDBUpdateErr.AppendMessage(err)
 }
 
