@@ -20,6 +20,7 @@ type Config struct {
 	Collection                  string `env:"COLLECTION"`
 	Db                          string `env:"DB"`
 	DbTimeout                   int    `env:"DB_TIMEOUT"`
+	ParsedTime                  string
 }
 
 func NewConfig(path string) (*Config, error) {

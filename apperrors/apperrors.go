@@ -47,6 +47,10 @@ var (
 		Message: "Could not delete subscription",
 		Code:    "MONGO_DB_DELETE_ERR",
 	}
+	TimeParseErr = AppError{
+		Message: "Could not parse time",
+		Code:    "TIME_PARSE_ERR",
+	}
 )
 
 func (appError *AppError) Error() string {

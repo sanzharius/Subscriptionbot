@@ -6,6 +6,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"strings"
 	"subscriptionbot/apperrors"
 	"subscriptionbot/config"
 	"subscriptionbot/database"
@@ -60,7 +61,7 @@ func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update)
 	}
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-	txt := tgbotapi.NewMessage(update.Message.Chat.ID, "send your location to subscribe")
+	txt := tgbotapi.NewMessage(update.Message.Chat.ID, "send your location to subscribe and then write UTC time")
 	txt2 := tgbotapi.NewMessage(update.Message.Chat.ID, "You are unsubscribed")
 
 	switch update.Message.Text {
@@ -82,21 +83,21 @@ func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update)
 		if err != nil {
 			return nil, apperrors.MongoDBDataNotFoundErr.AppendMessage(err)
 		}
+
 	}
+
 	if update.Message.Location != nil {
 		err := bot.Subscribe(ctx, update.Message)
 		if err != nil {
 			return nil, apperrors.MongoDBUpdateErr.AppendMessage(err)
 		}
-
-		getWeatherResponse, err := bot.weatherClient.GetWeatherForecast(update.Message.Location.Latitude, update.Message.Location.Longitude)
-		if err != nil {
-			return nil, apperrors.MessageUnmarshallingError.AppendMessage(err)
-		}
-
-		msg.Text = MapGetWeatherResponseHTML(getWeatherResponse)
-		msg.ParseMode = "HTML"
 	}
+
+	if update.Message != nil {
+		err := bot.ParseTime(update.Message.Text)
+		return nil, apperrors.TimeParseErr.AppendMessage(err)
+	}
+
 	return &msg, nil
 }
 
@@ -107,7 +108,11 @@ func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error 
 		Lon:    message.Location.Longitude,
 	}
 	_, err := bot.db.UpsertOne(ctx, &sub)
-	return apperrors.MongoDBUpdateErr.AppendMessage(err)
+	if err != nil {
+		return apperrors.MongoDBUpdateErr.AppendMessage(err)
+	}
+
+	return nil
 }
 
 func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
@@ -124,7 +129,7 @@ func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
 	return nil
 }
 
-func (bot *Bot) GetSubscriptions(ctx context.Context, update int) ([]*database.Subscription, error) {
+func (bot *Bot) GetSubscriptions(ctx context.Context, update string) ([]*database.Subscription, error) {
 	filter := bson.D{{"update_time", update}}
 	subs, err := bot.db.Find(ctx, filter)
 	if err != nil {
@@ -135,18 +140,12 @@ func (bot *Bot) GetSubscriptions(ctx context.Context, update int) ([]*database.S
 	return subs, nil
 }
 
-func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 10)
-	utcLocation, err := time.LoadLocation("UTC")
-	if err != nil {
-		log.Fatal(err)
-	}
+func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime string) {
+	duration := bot.ParseTime(updateTime)
+	ticker := time.NewTicker(duration)
 
-	for t := range ticker.C {
-		utcTime := t.In(utcLocation)
-		min := utcTime.Minute()
-		hour := utcTime.Hour()
-		updateTime := hour*100 + min
+	for range ticker.C {
+
 		subs, err := bot.GetSubscriptions(ctx, updateTime)
 		if err != nil {
 			log.Error(err)
@@ -158,6 +157,23 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (bot *Bot) ParseTime(text string) time.Duration {
+	inputTime := strings.TrimSpace(text)
+	parsedTime, err := time.Parse("15:04", inputTime)
+	if err != nil {
+		log.Error(err)
+	}
+
+	parsedTime = parsedTime.UTC()
+	now := time.Now().UTC()
+	if parsedTime.Before(now) {
+		parsedTime = parsedTime.Add(time.Hour * 24)
+	}
+
+	timeDuration := parsedTime.Sub(now)
+	return timeDuration
 }
 
 func (bot *Bot) SendWeatherUpdate(sub []*database.Subscription) error {

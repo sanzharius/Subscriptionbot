@@ -40,7 +40,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	go tgBot.PushWeatherUpdates(ctx, cfg.ParsedTime)
 	tgBot.ReplyingOnMessages(ctx)
-	go tgBot.PushWeatherUpdates(ctx)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), nil))
 }

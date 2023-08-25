@@ -24,7 +24,7 @@ type Subscription struct {
 	Lat        float64            `bson:"lat, required"`
 	Lon        float64            `bson:"lon, required"`
 	UpdateTime int                `bson:"update_time"`
-	Loc        *tgbotapi.Location
+	Update     *tgbotapi.Update
 }
 
 func NewSubscriptionStorage(cfg *config.Config) *SubscriptionStorage {
@@ -67,13 +67,14 @@ func (db *SubscriptionStorage) InsertOne(ctx context.Context, ins *Subscription)
 
 func (db *SubscriptionStorage) UpsertOne(ctx context.Context, ins *Subscription) (*mongo.UpdateResult, error) {
 	filter := bson.D{{"chat_id", ins.ChatId}}
-	update := bson.D{{"$set", bson.D{{"chat_", ins.ChatId}, {"lat", ins.Lat}, {"lon", ins.Lon},
+	update := bson.D{{"$set", bson.D{{"lat", ins.Lat}, {"lon", ins.Lon},
 		{"update_time", ins.UpdateTime}}}}
 	opts := options.Update().SetUpsert(true)
 	result, err := db.collection.UpdateOne(ctx, filter, update, opts)
 	if err != nil {
 		return nil, apperrors.MongoDBUpdateErr.AppendMessage(err)
 	}
+
 	return result, nil
 }
 
