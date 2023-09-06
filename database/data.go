@@ -23,7 +23,7 @@ type Subscription struct {
 	ChatId     int64              `bson:"chat_id"`
 	Lat        float64            `bson:"lat, required"`
 	Lon        float64            `bson:"lon, required"`
-	UpdateTime int                `bson:"update_time"`
+	UpdateTime string             `bson:"update_time"`
 	Update     *tgbotapi.Update
 }
 

@@ -20,6 +20,8 @@ var subKeyboard = tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButton("/unsubscribe")),
 )
 
+const layout = time.RFC822
+
 type Bot struct {
 	cfg           *config.Config
 	weatherClient *httpclient.WeatherClient
@@ -93,9 +95,11 @@ func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update)
 		}
 	}
 
-	if update.Message != nil {
-		err := bot.ParseTime(update.Message.Text)
-		return nil, apperrors.TimeParseErr.AppendMessage(err)
+	if isRFCTimeLayout(update.Message.Text) {
+		err := bot.UpdateTimeSubscriptionByChatID(ctx, update.Message.Chat.ID, update.Message.Text)
+		if err != nil {
+			return nil, apperrors.MongoDBUpdateErr.AppendMessage(err)
+		}
 	}
 
 	return &msg, nil
@@ -107,6 +111,21 @@ func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error 
 		Lat:    message.Location.Latitude,
 		Lon:    message.Location.Longitude,
 	}
+
+	_, err := bot.db.UpsertOne(ctx, &sub)
+	if err != nil {
+		return apperrors.MongoDBUpdateErr.AppendMessage(err)
+	}
+
+	return nil
+}
+
+func (bot *Bot) UpdateTimeSubscriptionByChatID(ctx context.Context, chatID int64, updateTime string) error {
+	sub := database.Subscription{
+		ChatId:     chatID,
+		UpdateTime: updateTime,
+	}
+	bot.ParseTime(updateTime)
 	_, err := bot.db.UpsertOne(ctx, &sub)
 	if err != nil {
 		return apperrors.MongoDBUpdateErr.AppendMessage(err)
@@ -141,8 +160,8 @@ func (bot *Bot) GetSubscriptions(ctx context.Context, update string) ([]*databas
 }
 
 func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime string) {
-	duration := bot.ParseTime(updateTime)
-	ticker := time.NewTicker(duration)
+
+	ticker := time.NewTicker(time.Hour * 24)
 
 	for range ticker.C {
 
@@ -160,10 +179,14 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime string) {
 }
 
 func (bot *Bot) ParseTime(text string) time.Duration {
+	fmt.Println("text=", text)
 	inputTime := strings.TrimSpace(text)
-	parsedTime, err := time.Parse("15:04", inputTime)
+	fmt.Println("inputTime=", inputTime)
+	parsedTime, err := time.Parse(layout, inputTime)
+	fmt.Println("parsedTime=", err)
 	if err != nil {
 		log.Error(err)
+		return 0
 	}
 
 	parsedTime = parsedTime.UTC()
@@ -198,4 +221,9 @@ func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {
 
 	reply := fmt.Sprintf(message, list.Name, list.Main.Temp, list.Main.Temp, list.Weather[0].Description)
 	return reply
+}
+
+func isRFCTimeLayout(text string) bool {
+	text = time.RFC822
+	return true
 }
