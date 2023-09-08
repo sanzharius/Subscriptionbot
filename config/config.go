@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/caarlos0/env/v8"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"os"
 	"subscriptionbot/apperrors"
 )
@@ -20,7 +21,7 @@ type Config struct {
 	Collection                  string `env:"COLLECTION"`
 	Db                          string `env:"DB"`
 	DbTimeout                   int    `env:"DB_TIMEOUT"`
-	ParsedTime                  string
+	ParsedTime                  primitive.DateTime
 }
 
 func NewConfig(path string) (*Config, error) {

@@ -6,6 +6,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"strings"
 	"subscriptionbot/apperrors"
 	"subscriptionbot/config"
@@ -72,12 +73,12 @@ func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update)
 	case "/close":
 		msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 	case subKeyboard.Keyboard[0][0].Text:
-		fmt.Printf("message: %s\n", update.Message.Text)
+		log.Printf("message: %s\n", update.Message.Text)
 		if _, err := bot.tgClient.Send(txt); err != nil {
 			return nil, apperrors.MessageUnmarshallingError.AppendMessage(err)
 		}
 	case subKeyboard.Keyboard[0][1].Text:
-		fmt.Printf("message: %s\n", update.Message.Text)
+		log.Printf("message: %s\n", update.Message.Text)
 		if _, err := bot.tgClient.Send(txt2); err != nil {
 			return nil, apperrors.MessageUnmarshallingError.AppendMessage(err)
 		}
@@ -95,8 +96,8 @@ func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update)
 		}
 	}
 
-	if isRFCTimeLayout(update.Message.Text) {
-		err := bot.UpdateTimeSubscriptionByChatID(ctx, update.Message.Chat.ID, update.Message.Text)
+	if parsedTime, err := parseTime(update.Message.Text); err != nil {
+		err := bot.UpdateTimeSubscriptionByChatID(ctx, update.Message.Chat.ID, parsedTime)
 		if err != nil {
 			return nil, apperrors.MongoDBUpdateErr.AppendMessage(err)
 		}
@@ -120,12 +121,13 @@ func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error 
 	return nil
 }
 
-func (bot *Bot) UpdateTimeSubscriptionByChatID(ctx context.Context, chatID int64, updateTime string) error {
+func (bot *Bot) UpdateTimeSubscriptionByChatID(ctx context.Context, chatID int64, updateTime time.Time) error {
+	primitiveUpdatedTime := primitive.NewDateTimeFromTime(updateTime)
 	sub := database.Subscription{
 		ChatId:     chatID,
-		UpdateTime: updateTime,
+		UpdateTime: primitiveUpdatedTime,
 	}
-	bot.ParseTime(updateTime)
+
 	_, err := bot.db.UpsertOne(ctx, &sub)
 	if err != nil {
 		return apperrors.MongoDBUpdateErr.AppendMessage(err)
@@ -148,7 +150,7 @@ func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
 	return nil
 }
 
-func (bot *Bot) GetSubscriptions(ctx context.Context, update string) ([]*database.Subscription, error) {
+func (bot *Bot) GetSubscriptions(ctx context.Context, update primitive.DateTime) ([]*database.Subscription, error) {
 	filter := bson.D{{"update_time", update}}
 	subs, err := bot.db.Find(ctx, filter)
 	if err != nil {
@@ -159,9 +161,9 @@ func (bot *Bot) GetSubscriptions(ctx context.Context, update string) ([]*databas
 	return subs, nil
 }
 
-func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime string) {
+func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime primitive.DateTime) {
 
-	ticker := time.NewTicker(time.Hour * 24)
+	ticker := time.NewTicker(time.Minute * 1)
 
 	for range ticker.C {
 
@@ -176,27 +178,6 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime string) {
 			return
 		}
 	}
-}
-
-func (bot *Bot) ParseTime(text string) time.Duration {
-	fmt.Println("text=", text)
-	inputTime := strings.TrimSpace(text)
-	fmt.Println("inputTime=", inputTime)
-	parsedTime, err := time.Parse(layout, inputTime)
-	fmt.Println("parsedTime=", err)
-	if err != nil {
-		log.Error(err)
-		return 0
-	}
-
-	parsedTime = parsedTime.UTC()
-	now := time.Now().UTC()
-	if parsedTime.Before(now) {
-		parsedTime = parsedTime.Add(time.Hour * 24)
-	}
-
-	timeDuration := parsedTime.Sub(now)
-	return timeDuration
 }
 
 func (bot *Bot) SendWeatherUpdate(sub []*database.Subscription) error {
@@ -223,7 +204,17 @@ func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {
 	return reply
 }
 
-func isRFCTimeLayout(text string) bool {
-	text = time.RFC822
-	return true
+func parseTime(text string) (time.Time, error) {
+	fmt.Println("text=", text)
+	inputTime := strings.TrimSpace(text)
+	fmt.Println("inputTime=", inputTime)
+	parsedTime, err := time.Parse(layout, inputTime)
+	fmt.Println("parsedTime=", parsedTime)
+	if err != nil {
+		log.Error(err)
+		return time.Time{}, err
+	}
+
+	parsedTime = parsedTime.UTC()
+	return parsedTime, nil
 }
