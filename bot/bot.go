@@ -21,13 +21,14 @@ var subKeyboard = tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButton("/unsubscribe")),
 )
 
-const layout = time.RFC822
+const layout = time.TimeOnly
 
 type Bot struct {
 	cfg           *config.Config
 	weatherClient *httpclient.WeatherClient
 	tgClient      *tgbotapi.BotAPI
 	db            *database.SubscriptionStorage
+	subs          *database.Subscription
 }
 
 func NewBot(config *config.Config, weatherClient *httpclient.WeatherClient, tgClient *tgbotapi.BotAPI, db *database.SubscriptionStorage) (*Bot, error) {
@@ -161,13 +162,13 @@ func (bot *Bot) GetSubscriptions(ctx context.Context, update primitive.DateTime)
 	return subs, nil
 }
 
-func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime primitive.DateTime) {
+func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 
 	ticker := time.NewTicker(time.Minute * 1)
 
 	for range ticker.C {
 
-		subs, err := bot.GetSubscriptions(ctx, updateTime)
+		subs, err := bot.GetSubscriptions(ctx, bot.subs.UpdateTime)
 		if err != nil {
 			log.Error(err)
 		}
@@ -181,7 +182,7 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context, updateTime primitive.Dat
 }
 
 func (bot *Bot) SendWeatherUpdate(sub []*database.Subscription) error {
-	pushAns, err := bot.weatherClient.GetWeatherForecast(sub[0].Lat, sub[1].Lon)
+	pushAns, err := bot.weatherClient.GetWeatherForecast(sub[2].Lat, sub[3].Lon)
 	if err != nil {
 		return apperrors.MessageUnmarshallingError.AppendMessage(err)
 	}
