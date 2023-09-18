@@ -51,8 +51,8 @@ func (db *SubscriptionStorage) Disconnect(ctx context.Context) error {
 	return db.client.Disconnect(ctx)
 }
 
-func (db *SubscriptionStorage) InsertOne(ctx context.Context, ins *Subscription) (primitive.ObjectID, error) {
-	result, err := db.collection.InsertOne(ctx, ins)
+func (db *SubscriptionStorage) InsertOne(ctx context.Context, subscription *Subscription) (primitive.ObjectID, error) {
+	result, err := db.collection.InsertOne(ctx, subscription)
 	if err != nil {
 		return primitive.NilObjectID, apperrors.MongoDBDataNotFoundErr.AppendMessage(err)
 	}
@@ -65,10 +65,10 @@ func (db *SubscriptionStorage) InsertOne(ctx context.Context, ins *Subscription)
 	return id, nil
 }
 
-func (db *SubscriptionStorage) UpsertOne(ctx context.Context, ins *Subscription) (*mongo.UpdateResult, error) {
-	filter := bson.D{{"chat_id", ins.ChatId}}
-	update := bson.D{{"$set", bson.D{{"lat", ins.Lat}, {"lon", ins.Lon},
-		{"update_time", ins.UpdateTime}}}}
+func (db *SubscriptionStorage) UpsertOne(ctx context.Context, subscription *Subscription) (*mongo.UpdateResult, error) {
+	filter := bson.D{{"chat_id", subscription.ChatId}}
+	update := bson.D{{"$set", bson.D{{"lat", subscription.Lat}, {"lon", subscription.Lon},
+		{"update_time", subscription.UpdateTime}}}}
 	opts := options.Update().SetUpsert(true)
 	result, err := db.collection.UpdateOne(ctx, filter, update, opts)
 	if err != nil {

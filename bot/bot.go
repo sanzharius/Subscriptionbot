@@ -28,7 +28,6 @@ type Bot struct {
 	weatherClient *httpclient.WeatherClient
 	tgClient      *tgbotapi.BotAPI
 	db            *database.SubscriptionStorage
-	subs          *database.Subscription
 }
 
 func NewBot(config *config.Config, weatherClient *httpclient.WeatherClient, tgClient *tgbotapi.BotAPI, db *database.SubscriptionStorage) (*Bot, error) {
@@ -151,7 +150,9 @@ func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
 	return nil
 }
 
-func (bot *Bot) GetSubscriptions(ctx context.Context, update primitive.DateTime) ([]*database.Subscription, error) {
+func (bot *Bot) GetSubscriptions(ctx context.Context) ([]*database.Subscription, error) {
+	timeNow := time.Now()
+	update := primitive.NewDateTimeFromTime(timeNow)
 	filter := bson.D{{"update_time", update}}
 	subs, err := bot.db.Find(ctx, filter)
 	if err != nil {
@@ -168,9 +169,10 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 
 	for range ticker.C {
 
-		subs, err := bot.GetSubscriptions(ctx, bot.subs.UpdateTime)
+		subs, err := bot.GetSubscriptions(ctx)
 		if err != nil {
 			log.Error(err)
+			return
 		}
 
 		err = bot.SendWeatherUpdate(subs)
@@ -206,11 +208,11 @@ func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {
 }
 
 func parseTime(text string) (time.Time, error) {
-	fmt.Println("text=", text)
+	log.Println("text=", text)
 	inputTime := strings.TrimSpace(text)
-	fmt.Println("inputTime=", inputTime)
+	log.Println("inputTime=", inputTime)
 	parsedTime, err := time.Parse(layout, inputTime)
-	fmt.Println("parsedTime=", parsedTime)
+	log.Println("parsedTime=", parsedTime)
 	if err != nil {
 		log.Error(err)
 		return time.Time{}, err
