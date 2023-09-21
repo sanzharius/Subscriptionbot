@@ -107,12 +107,12 @@ func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update)
 }
 
 func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error {
-	UpdatedTime := primitive.NewDateTimeFromTime(message.Time())
+	updatedTime := primitive.NewDateTimeFromTime(message.Time())
 	sub := database.Subscription{
 		ChatId:     message.Chat.ID,
 		Lat:        message.Location.Latitude,
 		Lon:        message.Location.Longitude,
-		UpdateTime: UpdatedTime,
+		UpdateTime: updatedTime,
 	}
 
 	_, err := bot.db.UpsertOne(ctx, &sub)
@@ -214,8 +214,7 @@ func parseTime(text string) (time.Time, error) {
 	inputTime := strings.TrimSpace(text)
 	log.Println("inputTime=", inputTime)
 	parsedTime, err := time.Parse(layout, inputTime)
-	duration := 2 * time.Minute
-	parsedResult := parsedTime.Round(duration)
+	parsedResult := parsedTime.Round(time.Minute)
 	log.Println("parsedResult=", parsedResult)
 	if err != nil {
 		log.Error(err)
