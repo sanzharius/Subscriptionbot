@@ -57,8 +57,8 @@ func (db *SubscriptionStorage) InsertOne(ctx context.Context, subscription *Subs
 		return primitive.NilObjectID, apperrors.MongoDBDataNotFoundErr.AppendMessage(err)
 	}
 
-	id, _ := result.InsertedID.(primitive.ObjectID)
-	if err != nil {
+	id, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
 		return primitive.NilObjectID, apperrors.MongoDBDataNotFoundErr.AppendMessage(err)
 	}
 
