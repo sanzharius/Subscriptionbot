@@ -116,7 +116,7 @@ func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error 
 	}
 
 	date, err := bot.db.InsertOne(ctx, &sub)
-	log.Println("insertedDate=", date)
+	log.Infof("insertedDate= %s", date)
 	if err != nil {
 		return apperrors.MongoDBUpdateErr.AppendMessage(err)
 	}
@@ -132,7 +132,7 @@ func (bot *Bot) UpdateTimeSubscriptionByChatID(ctx context.Context, chatID int64
 	}
 
 	timeDate, err := bot.db.UpsertOne(ctx, &sub)
-	log.Println("timeDate=", timeDate)
+	log.Infof("timeDate= %s", timeDate)
 	if err != nil {
 		return apperrors.MongoDBUpdateErr.AppendMessage(err)
 	}
@@ -159,7 +159,7 @@ func (bot *Bot) GetSubscriptions(ctx context.Context) ([]*database.Subscription,
 	update := primitive.NewDateTimeFromTime(timeNow)
 	filter := bson.D{{"update_time", update}}
 	subs, err := bot.db.Find(ctx, filter)
-	log.Println("subsTime=", subs)
+	log.Infof("subsTime= %s", subs)
 	if err != nil {
 		log.Error(err)
 		return nil, apperrors.MongoDBFindErr.AppendMessage(err)
