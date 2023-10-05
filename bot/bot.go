@@ -170,7 +170,7 @@ func (bot *Bot) GetSubscriptions(ctx context.Context) ([]*database.Subscription,
 
 func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 
-	ticker := time.NewTicker(time.Minute * 1)
+	ticker := time.NewTicker(24 * time.Hour)
 
 	for range ticker.C {
 
@@ -189,6 +189,7 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 }
 
 func (bot *Bot) SendWeatherUpdate(sub []*database.Subscription) error {
+
 	pushAns, err := bot.weatherClient.GetWeatherForecast(sub[2].Lat, sub[3].Lon)
 	if err != nil {
 		return apperrors.MessageUnmarshallingError.AppendMessage(err)
