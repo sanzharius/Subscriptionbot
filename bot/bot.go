@@ -155,10 +155,7 @@ func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
 }
 
 func (bot *Bot) GetSubscriptions(ctx context.Context) ([]*database.Subscription, error) {
-	timeNow := time.Now()
-	update := primitive.NewDateTimeFromTime(timeNow)
-	filter := bson.D{{"update_time", update}}
-	subs, err := bot.db.Find(ctx, filter)
+	subs, err := bot.db.Find(ctx, bson.D{})
 	log.Infof("subsTime= %s", subs)
 	if err != nil {
 		log.Error(err)
@@ -180,7 +177,7 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 			return
 		}
 
-		err = bot.SendWeatherUpdate(subs)
+		bot.SendWeatherUpdate(subs)
 		if err != nil {
 			log.Error(err)
 			return
@@ -188,22 +185,26 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 	}
 }
 
-func (bot *Bot) SendWeatherUpdate(sub []*database.Subscription) error {
+func (bot *Bot) SendWeatherUpdate(subscriptions []*database.Subscription) {
 
-	pushAns, err := bot.weatherClient.GetWeatherForecast(sub[2].Lat, sub[3].Lon)
-	if err != nil {
-		return apperrors.MessageUnmarshallingError.AppendMessage(err)
+	for _, subscription := range subscriptions {
+		pushAns, err := bot.weatherClient.GetWeatherForecast(subscription.Lat, subscription.Lon)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		reply := MapGetWeatherResponseHTML(pushAns)
+		message := tgbotapi.NewMessage(subscription.ChatId, reply)
+		message.ParseMode = "HTML"
+		_, err = bot.tgClient.Send(message)
+		if err != nil {
+			log.Error(err)
+			return
+		}
 	}
 
-	reply := MapGetWeatherResponseHTML(pushAns)
-	message := tgbotapi.NewMessage(sub[0].ChatId, reply)
-	message.ParseMode = "HTML"
-	_, err = bot.tgClient.Send(message)
-	if err != nil {
-		return apperrors.MessageUnmarshallingError.AppendMessage(err)
-	}
-
-	return apperrors.DataNotFoundErr.AppendMessage(err)
+	return
 }
 
 func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {
