@@ -7,7 +7,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"strings"
 	"subscriptionbot/apperrors"
 	"subscriptionbot/config"
 	"subscriptionbot/database"
@@ -20,8 +19,6 @@ var subKeyboard = tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButton("/subscribe"),
 		tgbotapi.NewKeyboardButton("/unsubscribe")),
 )
-
-const layout = time.TimeOnly
 
 type Bot struct {
 	cfg           *config.Config
@@ -96,18 +93,11 @@ func (bot *Bot) GetMessageByUpdate(ctx context.Context, update *tgbotapi.Update)
 		}
 	}
 
-	if parsedTime, err := parseTime(update.Message.Text); err != nil {
-		err := bot.UpdateTimeSubscriptionByChatID(ctx, update.Message.Chat.ID, parsedTime)
-		if err != nil {
-			return nil, apperrors.MongoDBUpdateErr.AppendMessage(err)
-		}
-	}
-
 	return &msg, nil
 }
 
 func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error {
-	updatedTime := primitive.NewDateTimeFromTime(message.Time())
+	updatedTime := primitive.NewDateTimeFromTime(message.Time().UTC())
 	sub := database.Subscription{
 		ChatId:     message.Chat.ID,
 		Lat:        message.Location.Latitude,
@@ -117,22 +107,6 @@ func (bot *Bot) Subscribe(ctx context.Context, message *tgbotapi.Message) error 
 
 	date, err := bot.db.InsertOne(ctx, &sub)
 	log.Infof("insertedDate= %s", date)
-	if err != nil {
-		return apperrors.MongoDBUpdateErr.AppendMessage(err)
-	}
-
-	return nil
-}
-
-func (bot *Bot) UpdateTimeSubscriptionByChatID(ctx context.Context, chatID int64, updateTime time.Time) error {
-	primitiveUpdatedTime := primitive.NewDateTimeFromTime(updateTime)
-	sub := database.Subscription{
-		ChatId:     chatID,
-		UpdateTime: primitiveUpdatedTime,
-	}
-
-	timeDate, err := bot.db.UpsertOne(ctx, &sub)
-	log.Infof("timeDate= %s", timeDate)
 	if err != nil {
 		return apperrors.MongoDBUpdateErr.AppendMessage(err)
 	}
@@ -177,7 +151,7 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 			return
 		}
 
-		bot.SendWeatherUpdate(subs)
+		err = bot.SendWeatherUpdate(subs)
 		if err != nil {
 			log.Error(err)
 			return
@@ -185,13 +159,12 @@ func (bot *Bot) PushWeatherUpdates(ctx context.Context) {
 	}
 }
 
-func (bot *Bot) SendWeatherUpdate(subscriptions []*database.Subscription) {
+func (bot *Bot) SendWeatherUpdate(subscriptions []*database.Subscription) error {
 
 	for _, subscription := range subscriptions {
 		pushAns, err := bot.weatherClient.GetWeatherForecast(subscription.Lat, subscription.Lon)
 		if err != nil {
-			log.Error(err)
-			return
+			return apperrors.MessageUnmarshallingError.AppendMessage(err)
 		}
 
 		reply := MapGetWeatherResponseHTML(pushAns)
@@ -199,12 +172,11 @@ func (bot *Bot) SendWeatherUpdate(subscriptions []*database.Subscription) {
 		message.ParseMode = "HTML"
 		_, err = bot.tgClient.Send(message)
 		if err != nil {
-			log.Error(err)
-			return
+			return apperrors.MessageUnmarshallingError.AppendMessage(err)
 		}
 	}
 
-	return
+	return nil
 }
 
 func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {
@@ -212,20 +184,4 @@ func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {
 
 	reply := fmt.Sprintf(message, list.Name, list.Main.Temp, list.Main.Temp, list.Weather[0].Description)
 	return reply
-}
-
-func parseTime(text string) (time.Time, error) {
-	log.Println("text=", text)
-	inputTime := strings.TrimSpace(text)
-	log.Println("inputTime=", inputTime)
-	parsedTime, err := time.Parse(layout, inputTime)
-	parsedResult := parsedTime.Round(time.Minute)
-	log.Println("parsedResult=", parsedResult)
-	if err != nil {
-		log.Error(err)
-		return time.Time{}, err
-	}
-
-	parsedResult = parsedResult.UTC()
-	return parsedResult, nil
 }
