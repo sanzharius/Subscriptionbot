@@ -13,6 +13,16 @@ import (
 	"time"
 )
 
+type SubscriptionRepository interface {
+	Disconnect(ctx context.Context) error
+	InsertOne(ctx context.Context, subscription *Subscription) (primitive.ObjectID, error)
+	UpsertOne(ctx context.Context, subscription *Subscription) (*mongo.UpdateResult, error)
+	FindSubscriptionByChatID(ctx context.Context, chatID int64) (*Subscription, error)
+	Find(ctx context.Context, filter bson.D) ([]*Subscription, error)
+	UpdateByID(ctx context.Context, id primitive.ObjectID, upd *Subscription) (int, error)
+	DeleteOne(ctx context.Context, id primitive.ObjectID) error
+}
+
 type SubscriptionStorage struct {
 	collection *mongo.Collection
 	client     *mongo.Client
@@ -27,7 +37,7 @@ type Subscription struct {
 	Update     *tgbotapi.Update
 }
 
-func NewSubscriptionStorage(cfg *config.Config) *SubscriptionStorage {
+func NewSubscriptionStorage(cfg *config.Config) SubscriptionRepository {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.DbTimeout)*time.Second)
 	defer cancel()
 

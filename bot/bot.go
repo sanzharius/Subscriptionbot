@@ -24,10 +24,10 @@ type Bot struct {
 	cfg           *config.Config
 	weatherClient *httpclient.WeatherClient
 	tgClient      *tgbotapi.BotAPI
-	db            *database.SubscriptionStorage
+	db            *database.SubscriptionRepository
 }
 
-func NewBot(config *config.Config, weatherClient *httpclient.WeatherClient, tgClient *tgbotapi.BotAPI, db *database.SubscriptionStorage) (*Bot, error) {
+func NewBot(config *config.Config, weatherClient *httpclient.WeatherClient, tgClient *tgbotapi.BotAPI, db *database.SubscriptionRepository) (*Bot, error) {
 	log.Printf("Authorized on account %s", tgClient.Self.UserName)
 	return &Bot{
 		cfg:           config,
