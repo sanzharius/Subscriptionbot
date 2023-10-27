@@ -183,5 +183,6 @@ func MapGetWeatherResponseHTML(list *httpclient.GetWeatherResponse) string {
 	message := "<b>%s</b>: <b>%.2fdegC</b>\n" + "Feels like <b>%.2fdegC</b>.%s\n"
 
 	reply := fmt.Sprintf(message, list.Name, list.Main.Temp, list.Main.Temp, list.Weather[0].Description)
+
 	return reply
 }
