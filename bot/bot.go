@@ -130,7 +130,7 @@ func (bot *Bot) Unsubscribe(ctx context.Context, chatId int64) error {
 
 func (bot *Bot) GetSubscriptions(ctx context.Context) ([]*database.Subscription, error) {
 	subs, err := bot.db.Find(ctx, bson.D{})
-	log.Infof("subsTime= %s", subs)
+	log.Infof("subsTime= %v", subs)
 	if err != nil {
 		log.Error(err)
 		return nil, apperrors.MongoDBFindErr.AppendMessage(err)
