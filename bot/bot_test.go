@@ -139,6 +139,13 @@ func generateBotOkJsonApiResponse() (string, error) {
 }
 
 func TestNewBot(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
+	bot := &Bot{
+		db: mockRepo,
+	}
 	apiToken := os.Getenv("TELEGRAM_BOT_TOKEN")
 	testConfig := &config.Config{
 		TelegramBotTok: apiToken,
@@ -156,7 +163,7 @@ func TestNewBot(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	if _, err := NewBot(testConfig, nil, tgClient, nil); err != nil {
+	if _, err := NewBot(testConfig, nil, tgClient, bot.db); err != nil {
 		t.Log(err)
 	}
 }
@@ -336,6 +343,7 @@ func TestSubscribe(t *testing.T) {
 	bot := &Bot{
 		db: mockRepo,
 	}
+
 	mockRepo.EXPECT().InsertOne(gomock.Any(), gomock.Any()).Return(primitive.NilObjectID, nil)
 	message := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{
