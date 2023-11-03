@@ -352,28 +352,51 @@ func TestGetMessageByUpdate(t *testing.T) {
 }
 
 func TestSubscribe(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
-	bot := &Bot{
-		db: mockRepo,
+	type mockSubBehavior func(r *mock_database.MockSubscriptionRepository, sub *database.Subscription)
+	ttPass := []struct {
+		name            string
+		message         *tgbotapi.Message
+		inputSub        *database.Subscription
+		mockSubBehavior mockSubBehavior
+	}{
+		{
+			"Ok",
+			&tgbotapi.Message{
+				Chat: &tgbotapi.Chat{
+					ID: 123,
+				},
+				Location: &tgbotapi.Location{
+					Latitude:  52.237049,
+					Longitude: 21.017532,
+				},
+			},
+			&database.Subscription{
+				ID:     primitive.NewObjectID(),
+				ChatId: 123,
+				Lat:    52.237049,
+				Lon:    21.017532,
+			},
+			func(r *mock_database.MockSubscriptionRepository, sub *database.Subscription) {
+				r.EXPECT().InsertOne(gomock.Any(), sub).Return(primitive.NewObjectID(), nil)
+			},
+		},
 	}
 
-	mockRepo.EXPECT().InsertOne(gomock.Any(), gomock.Any()).Return(primitive.NilObjectID, nil)
-	message := &tgbotapi.Message{
-		Chat: &tgbotapi.Chat{
-			ID: 123,
-		},
-		Location: &tgbotapi.Location{
-			Latitude:  52.237049,
-			Longitude: 21.017532,
-		},
-	}
+	for _, tc := range ttPass {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
+			tc.mockSubBehavior(mockRepo, tc.inputSub)
+			bot := &Bot{
+				db: mockRepo,
+			}
 
-	err := bot.Subscribe(context.Background(), message)
-	if err != nil {
-		t.Errorf("Expected no error, but got error %v", err)
+			err := bot.Subscribe(context.Background(), tc.message)
+			if err != nil {
+				t.Errorf("Expected no error, but got error %v", err)
+			}
+		})
 	}
 
 }
