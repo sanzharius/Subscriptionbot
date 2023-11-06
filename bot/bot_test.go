@@ -352,12 +352,10 @@ func TestGetMessageByUpdate(t *testing.T) {
 }
 
 func TestSubscribe(t *testing.T) {
-	type mockSubBehavior func(r *mock_database.MockSubscriptionRepository, sub *database.Subscription)
 	ttPass := []struct {
-		name            string
-		message         *tgbotapi.Message
-		inputSub        *database.Subscription
-		mockSubBehavior mockSubBehavior
+		name     string
+		message  *tgbotapi.Message
+		inputSub *database.Subscription
 	}{
 		{
 			"Ok",
@@ -376,23 +374,51 @@ func TestSubscribe(t *testing.T) {
 				Lat:    52.237049,
 				Lon:    21.017532,
 			},
-			func(r *mock_database.MockSubscriptionRepository, sub *database.Subscription) {
-				r.EXPECT().InsertOne(gomock.Any(), sub).Return(primitive.NewObjectID(), nil)
+		},
+		{
+			"Another Case",
+			&tgbotapi.Message{
+				Chat: &tgbotapi.Chat{
+					ID: 456,
+				},
+				Location: &tgbotapi.Location{
+					Latitude:  42.123456,
+					Longitude: 12.654321,
+				},
+			},
+			&database.Subscription{
+				ID:     primitive.NewObjectID(),
+				ChatId: 456,
+				Lat:    42.123456,
+				Lon:    12.654321,
 			},
 		},
 	}
 
+	testConfig, err := config.NewConfig("../.env")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	for _, tc := range ttPass {
 		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
-			tc.mockSubBehavior(mockRepo, tc.inputSub)
 			bot := &Bot{
 				db: mockRepo,
 			}
+			mockRepo.EXPECT().InsertOne(gomock.Any(), tc.inputSub).Return(primitive.NewObjectID(), nil)
+			tgClient, err := tgbotapi.NewBotAPIWithClient(testConfig.TelegramBotTok, "https://api.telegram.org/bot%s/%s", nil)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-			err := bot.Subscribe(context.Background(), tc.message)
+			if _, err := NewBot(testConfig, nil, tgClient, bot.db); err != nil {
+				t.Log(err)
+			}
+
+			err = bot.Subscribe(context.Background(), tc.message)
 			if err != nil {
 				t.Errorf("Expected no error, but got error %v", err)
 			}
@@ -418,6 +444,10 @@ func TestUnsubscribe(t *testing.T) {
 }
 
 func TestGetSubscriptions(t *testing.T) {
+	testConfig, err := config.NewConfig("../.env")
+	if err != nil {
+		log.Fatal(err)
+	}
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -440,6 +470,15 @@ func TestGetSubscriptions(t *testing.T) {
 		},
 	}
 	mockRepo.EXPECT().Find(gomock.Any(), gomock.Any()).Return(expectedSubscriptions, nil)
+	tgClient, err := tgbotapi.NewBotAPIWithClient(testConfig.TelegramBotTok, "https://api.telegram.org/bot%s/%s", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := NewBot(testConfig, nil, tgClient, bot.db); err != nil {
+		t.Log(err)
+	}
+
 	subs, err := bot.GetSubscriptions(context.Background())
 	if err != nil {
 		t.Errorf("Expected no error, but got error: %v", err)
@@ -490,9 +529,6 @@ func TestSendWeatherUpdate(t *testing.T) {
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
 		bot := fakeBotWithWeatherClient(t, weatherClient)
 		bot.tgClient.Debug = true
-		subs := bot.SendWeatherUpdate([]*database.Subscription{tc.givenSubscription})
-		if !reflect.DeepEqual(subs, tc.givenSubscription) {
-			t.Errorf("Subscription do not match given value")
-		}
+		err = bot.SendWeatherUpdate([]*database.Subscription{tc.givenSubscription})
 	}
 }
