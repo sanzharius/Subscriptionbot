@@ -152,9 +152,6 @@ func TestNewBot(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
-	bot := &Bot{
-		db: mockRepo,
-	}
 	apiToken := os.Getenv("TELEGRAM_BOT_TOKEN")
 	testConfig := &config.Config{
 		TelegramBotTok: apiToken,
@@ -172,7 +169,7 @@ func TestNewBot(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	if _, err := NewBot(testConfig, nil, tgClient, bot.db); err != nil {
+	if _, err := NewBot(testConfig, nil, tgClient, mockRepo); err != nil {
 		t.Log(err)
 	}
 }
