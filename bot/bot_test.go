@@ -36,11 +36,9 @@ func (t *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return response, nil
 }
 
-func fakeBotWithWeatherClient(t *testing.T, weatherClient *httpclient.WeatherClient) *Bot {
+func fakeBotWithWeatherClient(t *testing.T, weatherClient *httpclient.WeatherClient, mockRepo *mock_database.MockSubscriptionRepository) *Bot {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
 
 	apiToken := os.Getenv("TELEGRAM_BOT_TOKEN")
 	testConfig := &config.Config{
@@ -319,6 +317,11 @@ func TestGetMessageByUpdate(t *testing.T) {
 		log.Fatal(err)
 	}
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
+
 	for _, tc := range ttPass {
 		responseJSON, err := json.Marshal(tc.givenWeatherResponse)
 		if err != nil {
@@ -327,7 +330,7 @@ func TestGetMessageByUpdate(t *testing.T) {
 
 		httpClient := fakeHTTPBotClient(200, string(responseJSON))
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
-		bot := fakeBotWithWeatherClient(t, weatherClient)
+		bot := fakeBotWithWeatherClient(t, weatherClient, mockRepo)
 		bot.tgClient.Debug = true
 		msg, err := bot.GetMessageByUpdate(context.Background(), tc.givenMessage)
 		if err != nil {
@@ -409,10 +412,11 @@ func TestSubscribe(t *testing.T) {
 			}
 			weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
 
-			if _, err := NewBot(testConfig, weatherClient, tgClient, mockRepo); err != nil {
+			bot, err := NewBot(testConfig, weatherClient, tgClient, mockRepo)
+			if err != nil {
 				t.Log(err)
 			}
-			bot := fakeBotWithWeatherClient(t, weatherClient)
+
 			bot.tgClient.Debug = true
 
 			err = bot.Subscribe(context.Background(), tc.message)
@@ -466,10 +470,11 @@ func TestUnsubscribe(t *testing.T) {
 		}
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
 
-		if _, err := NewBot(testConfig, weatherClient, tgClient, mockRepo); err != nil {
+		bot, err := NewBot(testConfig, weatherClient, tgClient, mockRepo)
+		if err != nil {
 			t.Log(err)
 		}
-		bot := fakeBotWithWeatherClient(t, weatherClient)
+
 		bot.tgClient.Debug = true
 		err = bot.Unsubscribe(context.Background(), tc.chatID)
 		if err != nil {
@@ -547,11 +552,11 @@ func TestGetSubscriptions(t *testing.T) {
 		}
 
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
-		if _, err := NewBot(testConfig, weatherClient, tgClient, mockRepo); err != nil {
+		bot, err := NewBot(testConfig, weatherClient, tgClient, mockRepo)
+		if err != nil {
 			t.Log(err)
 		}
 
-		bot := fakeBotWithWeatherClient(t, weatherClient)
 		bot.tgClient.Debug = true
 
 		subs, err := bot.GetSubscriptions(context.Background())
@@ -596,6 +601,11 @@ func TestSendWeatherUpdate(t *testing.T) {
 		log.Fatal(err)
 	}
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
+
 	for _, tc := range ttPass {
 		responseJSON, err := json.Marshal(tc.givenWeatherResponse)
 		if err != nil {
@@ -604,7 +614,7 @@ func TestSendWeatherUpdate(t *testing.T) {
 
 		httpClient := fakeHTTPBotClient(200, string(responseJSON))
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
-		bot := fakeBotWithWeatherClient(t, weatherClient)
+		bot := fakeBotWithWeatherClient(t, weatherClient, mockRepo)
 		bot.tgClient.Debug = true
 		err = bot.SendWeatherUpdate([]*database.Subscription{tc.givenSubscription})
 	}
