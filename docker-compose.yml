@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - "8080"
+    environment:
+      MONGODB_URI: mongodb+srv://sanzharius1999:a555666@cluster0.upmpkjb.mongodb.net/?retryWrites=true&w=majority
+
+  mainservice:
+    build: .
+    image: main:latest
+    env_file: .env
+
+
+
+
+
+
