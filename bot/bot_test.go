@@ -257,11 +257,18 @@ func TestReplyingOnMessages(t *testing.T) {
 		log.Fatal(err)
 	}
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
+
 	for _, tc := range ttPass {
 		responseJSON, err := json.Marshal(tc.givenWeatherResponse)
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		mockRepo.EXPECT().InsertOne(gomock.Any(), gomock.Any()).Return(primitive.NewObjectID(), nil)
 
 		httpWeatherClient := fakeHTTPBotClient(200, string(responseJSON))
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpWeatherClient)
@@ -327,6 +334,13 @@ func TestGetMessageByUpdate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		mockRepo.EXPECT().InsertOne(gomock.Any(), &database.Subscription{
+			ID:     primitive.NewObjectID(),
+			ChatId: 300,
+			Lat:    52.237049,
+			Lon:    21.017532,
+		}).Return(primitive.NewObjectID(), nil)
 
 		httpClient := fakeHTTPBotClient(200, string(responseJSON))
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
