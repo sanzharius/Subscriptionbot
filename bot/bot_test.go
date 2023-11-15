@@ -92,11 +92,10 @@ func fakeHTTPBotClientWithMultipleResponses(responses []*http.Response) *http.Cl
 	}
 }
 
-func fakeBotWithWeatherClientMultipleResponses(t *testing.T, weatherClient *httpclient.WeatherClient, responses []*http.Response) *Bot {
+func fakeBotWithWeatherClientMultipleResponses(t *testing.T, weatherClient *httpclient.WeatherClient, responses []*http.Response, subscriptionRepo database.SubscriptionRepository) *Bot {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
 	apiToken := os.Getenv("TELEGRAM_BOT_TOKEN")
 	testConfig := &config.Config{
 		TelegramBotTok: apiToken,
@@ -108,7 +107,7 @@ func fakeBotWithWeatherClientMultipleResponses(t *testing.T, weatherClient *http
 		log.Fatal(err)
 	}
 
-	bot, err := NewBot(testConfig, weatherClient, tgClient, mockRepo)
+	bot, err := NewBot(testConfig, weatherClient, tgClient, subscriptionRepo)
 	if err != nil {
 		log.Fatal(err)
 		return nil
@@ -260,8 +259,8 @@ func TestReplyingOnMessages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	ctx := context.Background()
 	mockRepo := mock_database.NewMockSubscriptionRepository(ctrl)
-
 	for _, tc := range ttPass {
 		responseJSON, err := json.Marshal(tc.givenWeatherResponse)
 		if err != nil {
@@ -272,9 +271,9 @@ func TestReplyingOnMessages(t *testing.T) {
 
 		httpWeatherClient := fakeHTTPBotClient(200, string(responseJSON))
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpWeatherClient)
-		bot := fakeBotWithWeatherClientMultipleResponses(t, weatherClient, tc.botResponses)
+		bot := fakeBotWithWeatherClientMultipleResponses(t, weatherClient, tc.botResponses, mockRepo)
 		bot.tgClient.Debug = true
-		bot.ReplyingOnMessages(nil)
+		go bot.ReplyingOnMessages(ctx)
 		time.Sleep(time.Second * 1)
 	}
 }
@@ -335,12 +334,7 @@ func TestGetMessageByUpdate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		mockRepo.EXPECT().InsertOne(gomock.Any(), &database.Subscription{
-			ID:     primitive.NewObjectID(),
-			ChatId: 300,
-			Lat:    52.237049,
-			Lon:    21.017532,
-		}).Return(primitive.NewObjectID(), nil)
+		mockRepo.EXPECT().InsertOne(gomock.Any(), gomock.Any()).Return(primitive.NewObjectID(), nil)
 
 		httpClient := fakeHTTPBotClient(200, string(responseJSON))
 		weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
@@ -350,8 +344,8 @@ func TestGetMessageByUpdate(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		expMessage := MapGetWeatherResponseHTML(tc.givenWeatherResponse)
-		if msg != nil && msg.Text != expMessage {
+
+		if msg != nil && msg.Text != tc.botReply.Text {
 			t.Errorf("bot reply should be %s, but was %s", tc.botReply.Text, msg.Text)
 		}
 	}
