@@ -407,20 +407,15 @@ func TestSubscribe(t *testing.T) {
 
 	for _, tc := range ttPass {
 		t.Run(tc.name, func(t *testing.T) {
-			mockRepo.EXPECT().InsertOne(gomock.Any(), tc.inputSub).Return(primitive.NewObjectID(), nil)
+			mockRepo.EXPECT().InsertOne(gomock.Any(), gomock.Any()).Return(primitive.NewObjectID(), nil)
 			responseJSON, err := json.Marshal(tc.message)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			httpClient := fakeHTTPBotClient(200, string(responseJSON))
-			tgClient, err := tgbotapi.NewBotAPIWithClient(testConfig.TelegramBotTok, "https://api.telegram.org/bot%s/%s", httpClient)
-			if err != nil {
-				log.Fatal(err)
-			}
 			weatherClient := httpclient.NewWeatherClient(testConfig, httpClient)
-
-			bot, err := NewBot(testConfig, weatherClient, tgClient, mockRepo)
+			bot := fakeBotWithWeatherClient(t, weatherClient, mockRepo)
 			if err != nil {
 				t.Log(err)
 			}
